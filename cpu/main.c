@@ -117,10 +117,24 @@ list* find_queens_solutions(int* board, int static_rows) {
 	return current;
 }
 
-bool check_position(int* board) {
-	/* TODO */
+/*
+board: [1,0,3,2]		[X1,X2,X3,X4]
+index:  0,1,2,3			 Y1 Y2 Y3 Y4
+
+		A queen can attack another if:
+		X1-Y1 = X2-Y2 or X1+Y1 = X2+Y2 	(diagonals)
+*/
+/* TODO */
 	/* If any queen attacks other return false */
 	/* else return true */
+bool check_position(int* board) {
+	for(int i=0; i<BOARD_SIZE; i++){
+		for (int j = i+1; j < BOARD_SIZE; j++)
+		{
+			bool onTheSameDiagonal =  ((board[i]-i == board[j]-j ) || (board[i]+i == board[j]+j)) ;
+			if(onTheSameDiagonal) return false;
+		}
+	}
 	return true;
 }
 
