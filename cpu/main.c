@@ -118,9 +118,13 @@ list* find_queens_solutions(int* board, int static_rows) {
 }
 
 bool check_position(int* board) {
-	/* TODO */
-	/* If any queen attacks other return false */
-	/* else return true */
+	for(int i=0; i<BOARD_SIZE; i++){
+		for (int j = i+1; j < BOARD_SIZE; j++)
+		{
+			bool onTheSameDiagonal =  ((board[i]-i == board[j]-j ) || (board[i]+i == board[j]+j)) ;
+			if(onTheSameDiagonal) return false;
+		}
+	}
 	return true;
 }
 
