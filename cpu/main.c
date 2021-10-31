@@ -1,8 +1,9 @@
 ﻿#include <stdio.h>
 #include <windows.h>
 #include <stdbool.h>
+#include <pthread.h>
 
-#define BOARD_SIZE 4
+#define BOARD_SIZE 8
 #define NUM_OF_THREADS 4
 
 typedef struct node {
@@ -31,22 +32,53 @@ void swap(int* array,int e1,int e2);
 int* copy_array(int* src, int length);
 void print_list(list* head);
 void merge_lists(list* list1, list* list2);
+int size_of(list* head);
+
+/* Threads */
+pthread_mutex_t lock;
+list* boards;
+int static_rows = 0;
+int solutions_count = 0;
+void* start_thread();
 
 int main()
 {
-	int static_rows = get_static_rows();	
+	static_rows = get_static_rows();	
 	int* base_board = generate_base_board();
 	
 	/* Each board represents set of permutations */
-	list* boards = generate_boards(base_board, static_rows, 0);
+	boards = generate_boards(base_board, static_rows, 0);
 	
-	/* TODO Each board should be run in a separate thread */
-	list* current = boards;
-    while (current != NULL) {
-		list* solutions = find_queens_solutions(current->val, static_rows);
-		print_list(solutions);
-		current = current->next;
+	/* Init threads */
+	int err = pthread_mutex_init(&lock, NULL);
+	
+    if (err)
+    {
+        printf("\nMutex init error!");
+        return 1;
     }
+	
+	pthread_t tid[NUM_OF_THREADS];
+	
+	for(int i = 0; i < NUM_OF_THREADS; i++){
+		err = pthread_create(&(tid[i]), NULL, &start_thread, NULL);
+		if(err){
+			printf("\nThread init error!");
+			return 1;
+		}
+	}
+	
+	/* Clear threads */
+	for(int i = 0; i < NUM_OF_THREADS; i++){
+		pthread_join(tid[i], NULL);
+	}
+	
+    pthread_mutex_destroy(&lock);
+	
+	/* Print results */
+	printf("%s%d","Number of solutions: ", solutions_count);
+	
+	return 0;
 }
 
 int* generate_base_board(){
@@ -164,4 +196,37 @@ void merge_lists(list* list1, list* list2){
         current = current->next;
     }
 	current->next = list2;
+}
+
+int size_of(list* head){
+	list* current = head;
+	int size = 0;
+    while (current != NULL) {
+		size++;
+        current = current->next;
+    }
+	return size;
+}
+
+void* start_thread(){
+	list* solutions = NULL;
+	while(1){
+		pthread_mutex_lock(&lock);
+		
+		solutions_count += size_of(solutions);
+		
+		if(boards == NULL){
+			pthread_mutex_unlock(&lock);
+			return NULL;
+		}
+		
+		int* position = boards->val;
+		boards = boards->next;
+		
+		pthread_mutex_unlock(&lock);
+		
+		solutions = find_queens_solutions(position, static_rows);
+		/* If you want to print solutions */
+		/* print_list(solutions); */
+	}
 }
