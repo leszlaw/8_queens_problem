@@ -44,28 +44,25 @@ void* start_thread();
 
 int main()
 {
+	clock_t t = clock();
 
-	clock_t t;
-   	t = clock();
-
-
-	static_rows = get_static_rows();	
+	static_rows = get_static_rows();
 	int* base_board = generate_base_board();
-	
+
 	/* Each board represents set of permutations */
 	boards = generate_boards(base_board, static_rows, 0);
-	
+
 	/* Init threads */
 	int err = pthread_mutex_init(&lock, NULL);
-	
+
     if (err)
     {
         printf("\nMutex init error!");
         return 1;
     }
-	
+
 	pthread_t tid[NUM_OF_THREADS];
-	
+
 	for(int i = 0; i < NUM_OF_THREADS; i++){
 		err = pthread_create(&(tid[i]), NULL, &start_thread, NULL);
 		if(err){
@@ -73,23 +70,21 @@ int main()
 			return 1;
 		}
 	}
-	
+
 	/* Clear threads */
 	for(int i = 0; i < NUM_OF_THREADS; i++){
 		pthread_join(tid[i], NULL);
 	}
 
-
-
 	t = clock() - t;
    	double time_taken = ((double)t)/CLOCKS_PER_SEC; // calculate the elapsed time
    	printf("The program took %f seconds to execute\n", time_taken);
-	
+
     pthread_mutex_destroy(&lock);
-	
+
 	/* Print results */
 	printf("%s%d","Number of solutions: ", solutions_count);
-	
+
 	return 0;
 }
 
@@ -135,7 +130,7 @@ list* find_queens_solutions(int* board, int static_rows) {
 	    indexes[i] = 0;
 	}
 	current->next = NULL;
-	
+
 	/* Generate permutations using heap's algorithm */
 	int i = 0;
 	while (i < BOARD_SIZE - static_rows) {
@@ -224,19 +219,19 @@ void* start_thread(){
 	list* solutions = NULL;
 	while(1){
 		pthread_mutex_lock(&lock);
-		
+
 		solutions_count += size_of(solutions);
 		
 		if(boards == NULL){
 			pthread_mutex_unlock(&lock);
 			return NULL;
 		}
-		
+
 		int* position = boards->val;
 		boards = boards->next;
-		
+
 		pthread_mutex_unlock(&lock);
-		
+
 		solutions = find_queens_solutions(position, static_rows);
 		/* If you want to print solutions */
 		/* print_list(solutions); */
