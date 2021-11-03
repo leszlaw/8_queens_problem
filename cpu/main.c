@@ -2,8 +2,9 @@
 #include <windows.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <time.h>
 
-#define BOARD_SIZE 8
+#define BOARD_SIZE 12
 #define NUM_OF_THREADS 4
 
 typedef struct node {
@@ -43,6 +44,11 @@ void* start_thread();
 
 int main()
 {
+
+	clock_t t;
+   	t = clock();
+
+
 	static_rows = get_static_rows();	
 	int* base_board = generate_base_board();
 	
@@ -72,6 +78,12 @@ int main()
 	for(int i = 0; i < NUM_OF_THREADS; i++){
 		pthread_join(tid[i], NULL);
 	}
+
+
+
+	t = clock() - t;
+   	double time_taken = ((double)t)/CLOCKS_PER_SEC; // calculate the elapsed time
+   	printf("The program took %f seconds to execute\n", time_taken);
 	
     pthread_mutex_destroy(&lock);
 	
