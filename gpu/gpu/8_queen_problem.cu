@@ -47,7 +47,7 @@ void list_to_array(list* boards, int* boards_array);
 
 /* Threads */
 list* boards;
-int* boardsOnGPU;
+int* boards_on_gpu;
 int static_rows = 0;
 int solutions_count = 0;
 
@@ -71,13 +71,13 @@ int main() {
 	list_to_array(boards, boards_array);
 
 	////////////////////////////////	GPU		////////////////////////////////////
-	cudaMalloc(&boardsOnGPU, size_of(boards) * BOARD_SIZE);
-	cudaMemcpy(boardsOnGPU, &boards_array, BOARD_SIZE, cudaMemcpyHostToDevice);
+	cudaMalloc(&boards_on_gpu, size_of(boards) * BOARD_SIZE);
+	cudaMemcpy(boards_on_gpu, &boards_array, BOARD_SIZE, cudaMemcpyHostToDevice);
 
 	
 
 
-	cudaFree(boardsOnGPU);
+	cudaFree(boards_on_gpu);
 
 	t = clock() - t;
 	double time_taken = ((double)t) / CLOCKS_PER_SEC; // calculate the elapsed time
