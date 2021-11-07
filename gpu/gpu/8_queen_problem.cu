@@ -27,7 +27,7 @@ int get_static_rows();
 list* generate_boards(int* board_base, int static_rows, int pos);
 
 /* Returns non-attacking boards */
-list* find_queens_solutions(int* board, int static_rows);
+//list* find_queens_solutions(int* board, int static_rows);
 
 
 /* Check if the position has non attacking queens */
@@ -39,6 +39,7 @@ bool check_position(int* board);
 
 void swap(int* array, int e1, int e2);
 int* copy_array(int* src, int length);
+int* copy_array_gpu(int* src, int length);
 void print_list(list* head);
 void merge_lists(list* list1, list* list2);
 int size_of(list* head);
@@ -52,13 +53,86 @@ int static_rows = 0;
 int solutions_count = 0;
 
 
+__global__ void find_queens_solutions(int* boards, int static_rows) {
 
+	// Selecting board depending on thread index
+	int thread_idx = threadIdx.x;
+	int board_idx = thread_idx * BOARD_SIZE;
+	int* board;
+	cudaMalloc(&board, BOARD_SIZE * sizeof(int));
+	for (int k = 0; k < BOARD_SIZE; k++) {
+		board[k] = boards[k + board_idx];
+	}
+
+
+	list* current;
+	cudaMalloc(&current, sizeof(list));
+	list* head_holder = current;
+	int* indexes;
+	cudaMalloc(&indexes, sizeof(int) * BOARD_SIZE);
+	for (int i = 0; i < BOARD_SIZE; i++) {
+		indexes[i] = 0;
+	}
+	current->next = NULL;
+
+	/* Generate permutations using heap's algorithm */
+	int i = 0;
+	while (i < BOARD_SIZE - static_rows) {
+		if (indexes[i] < i) {
+
+			/////////// SWAP //////////////////
+			int buff = board[i];
+			board[i] = board[i % 2 == 0 ? 0 : indexes[i]];
+			board[i % 2 == 0 ? 0 : indexes[i]] = buff; 
+			//////////////////////////////////
+
+			////////////// CHECK POSITION ////////////////////
+			bool check_position = true;
+			for (int i = 0; i < BOARD_SIZE; i++) {
+				for (int j = i + 1; j < BOARD_SIZE; j++)
+				{
+					bool onTheSameDiagonal = ((board[i] - i == board[j] - j) || (board[i] + i == board[j] + j));
+					if (onTheSameDiagonal) {
+						check_position = false;
+						break;
+					}
+						
+				}
+			}
+			/////////////////////////////////////////////
+
+			if (check_position) {
+				cudaMalloc(&current->next, sizeof(list));
+				current = current->next;
+				/////////////////COPY ARRAY///////////////////////
+				int* arr;
+				cudaMalloc(&arr, sizeof(int) * BOARD_SIZE);
+				for (int i = 0; i < BOARD_SIZE; i++)
+					arr[i] = board[i];
+				/////////////////////////////////////////////
+				current->val = arr;
+				current->next = NULL;
+			}
+			indexes[i]++;
+			i = 0;
+		}
+		else {
+			indexes[i] = 0;
+			i++;
+		}
+	}
+	cudaFree(indexes);
+	current = head_holder->next;
+	cudaFree(head_holder);
+
+	
+}
 
 
 
 
 int main() {
-	DisplayHeader();
+	//DisplayHeader();
 
 	clock_t t = clock();
 	static_rows = get_static_rows();
@@ -67,23 +141,51 @@ int main() {
 
 	
 	// Copying list elements to an array
-	int* boards_array = (int*)malloc(size_of(boards) * BOARD_SIZE);
+	int* boards_array = (int*)malloc(size_of(boards) * BOARD_SIZE * sizeof(int));
 	list_to_array(boards, boards_array);
 
+
+
+    // Choose which GPU to run on, change this on a multi-GPU system.
+    cudaError_t cudaStatus = cudaSetDevice(0);
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
+        goto Error;
+    }
+
 	////////////////////////////////	GPU		////////////////////////////////////
-	cudaMalloc(&boards_on_gpu, size_of(boards) * BOARD_SIZE);
-	cudaMemcpy(boards_on_gpu, &boards_array, BOARD_SIZE, cudaMemcpyHostToDevice);
+	cudaMalloc(&boards_on_gpu, size_of(boards) * BOARD_SIZE * sizeof(int));
+	cudaMemcpy(boards_on_gpu, &boards_array, size_of(boards) * BOARD_SIZE * sizeof(int), cudaMemcpyHostToDevice);
+
+	find_queens_solutions <<< 1, size_of(boards) >>> (boards_on_gpu, static_rows);
+
+
+	// cudaDeviceSynchronize waits for the kernel to finish, and returns
+    // any errors encountered during the launch.
+    cudaStatus = cudaDeviceSynchronize();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching find_queens_solutions!\n", cudaStatus);
+        goto Error;
+    }
+
+
 
 	
-
-
-	cudaFree(boards_on_gpu);
+	cudaStatus = cudaDeviceReset();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaDeviceReset failed!");
+        return 1;
+    }
 
 	t = clock() - t;
 	double time_taken = ((double)t) / CLOCKS_PER_SEC; // calculate the elapsed time
 	printf("The program took %f seconds to execute\n", time_taken);
-	printf("%s%d", "Number of solutions: ", solutions_count); 
+	printf("%s%d", "Number of solutions: ", solutions_count);
 
+
+
+Error:
+    cudaFree(boards_on_gpu);
 	return 0;
 }
 
@@ -91,8 +193,9 @@ void list_to_array(list* boards, int* boards_array) {
 	list* current = boards;
 	int j = 0;
 	while (current != NULL) {
-		for (int i = 0; i < BOARD_SIZE; i++)
+		for (int i = 0; i < BOARD_SIZE; i++) 
 			boards_array[j++] = current->val[i];
+		
 		current = current->next;
 	}
 }
@@ -149,44 +252,6 @@ void merge_lists(list* list1, list* list2) {
 	current->next = list2;
 }
 
-
-list* find_queens_solutions(int* board, int static_rows) {
-	list* current;
-	cudaMalloc(&current, sizeof(list));
-	list* head_holder = current;
-	int* indexes;
-	cudaMalloc(&indexes, sizeof(int) * BOARD_SIZE);
-	for (int i = 0; i < BOARD_SIZE; i++) {
-		indexes[i] = 0;
-	}
-	current->next = NULL;
-
-	/* Generate permutations using heap's algorithm */
-	int i = 0;
-	while (i < BOARD_SIZE - static_rows) {
-		if (indexes[i] < i) {
-			swap(board, i % 2 == 0 ? 0 : indexes[i], i);
-			if (check_position(board)) {
-				cudaMalloc(&current->next, sizeof(list));
-				current = current->next;
-				cudaMemcpy(current->val, &board, BOARD_SIZE, cudaMemcpyDeviceToDevice);
-				current->next = NULL;
-			}
-			indexes[i]++;
-			i = 0;
-		}
-		else {
-			indexes[i] = 0;
-			i++;
-		}
-	}
-	cudaFree(indexes);
-	current = head_holder->next;
-	cudaFree(head_holder);
-	return current;
-}
-
-
 bool check_position(int* board) {
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = i + 1; j < BOARD_SIZE; j++)
@@ -200,6 +265,14 @@ bool check_position(int* board) {
 
 int* copy_array(int* src, int length) {
 	int* arr = (int*)malloc(sizeof(int) * length);
+	for (int i = 0; i < length; i++)
+		arr[i] = src[i];
+	return arr;
+}
+
+int* copy_array_gpu(int* src, int length) {
+	int* arr;
+	cudaMalloc(&arr, sizeof(int) * length);
 	for (int i = 0; i < length; i++)
 		arr[i] = src[i];
 	return arr;
