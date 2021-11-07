@@ -47,7 +47,7 @@ void list_to_array(list* boards, int* boards_array);
 
 /* Threads */
 list* boards;
-list* boardsOnGPU;
+int* boardsOnGPU;
 int static_rows = 0;
 int solutions_count = 0;
 
@@ -70,17 +70,9 @@ int main() {
 	int* boards_array = (int*)malloc(size_of(boards) * BOARD_SIZE);
 	list_to_array(boards, boards_array);
 
-
-	
-
-	
-
-	
-
 	////////////////////////////////	GPU		////////////////////////////////////
-	//list* boardsOnGPU = NULL;
-	cudaMalloc(&boardsOnGPU, sizeof(list));
-	cudaMemcpy(boardsOnGPU, &boards, BOARD_SIZE, cudaMemcpyHostToDevice);
+	cudaMalloc(&boardsOnGPU, size_of(boards) * BOARD_SIZE);
+	cudaMemcpy(boardsOnGPU, &boards_array, BOARD_SIZE, cudaMemcpyHostToDevice);
 
 	
 
