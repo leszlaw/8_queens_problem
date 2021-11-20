@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <time.h>
 
-#define BOARD_SIZE 12
+#define BOARD_SIZE 4
 #define NUM_OF_THREADS 4
 
 typedef struct node {
