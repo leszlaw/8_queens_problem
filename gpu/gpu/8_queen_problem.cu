@@ -80,7 +80,21 @@ __global__ void find_queens_solutions(int* boards, int static_rows, int* solutio
 			if (indexes[i] < i) {
 				gpu_swap(board, i % 2 == 0 ? 0 : indexes[i], i);
 				if (gpu_check_position(board)) {
-					
+					bool isSet = false;
+					do
+					{
+						if (isSet = atomicCAS(mutex, 0, 1) == 0)
+						{
+							for (int j = 0; j < BOARD_SIZE; j++) {
+								solutions[j + *solutionIdx * BOARD_SIZE] = board[j];
+							}
+							*solutionIdx = *solutionIdx + 1;
+						}
+						if (isSet)
+						{
+							*mutex = 0;
+						}
+					} while (!isSet);
 
 				}
 				indexes[i]++;
